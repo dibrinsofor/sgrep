@@ -1,5 +1,8 @@
 from pathlib import Path
-from typing import List, Tuple, Union, Never
+from src.parse_patterns import Tokenize, Parser, Node, SIdent
+from src.match import MatchPatterns
+import ast
+from typing import Optional, Union
 
 
 PYTHON_SUFFIX = ".py"
@@ -10,9 +13,26 @@ THIS_DIR = Path(__file__).parent
 DATA_DIR = THIS_DIR / "data"
 PROJECT_ROOT = THIS_DIR.parent
 
+Nodes = Union[SIdent, Func, Class]
 
-def assert_match(pattern: str, src: str, out: str) -> None:
-    assert find_match(pattern, src) == out
+def parse(src: str) -> Nodes:
+    tokens = Tokenize(src)
+    parser = Parser(tokens)
+    return parser.parse_commands()
+
+def assert_match(cmd: str, src: str, expected_matches: int, first: Optional[ast.AST] = None) -> None:
+    node = parse(cmd)
+
+    visitor = MatchPatterns.create(node)
+    visitor.visit(ast.parse(src))
+
+    assert len(visitor.matches) == expected_matches
+    assert visitor.matches[0] == first
+
+def assert_parse(cmd: str, expected: Node) -> None:
+    node = parse(cmd)
+
+    assert node == SIdent("*", True, False, False)
 
 def check_file(filepath: str, pattern: str) -> None:
     with open(DATA_DIR / filepath, "r") as f:
