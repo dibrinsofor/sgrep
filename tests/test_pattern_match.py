@@ -1,4 +1,4 @@
-from src.parse_patterns import Func
+from parse import Func
 from tests.utils import (
     assert_match,
     check_file
@@ -20,7 +20,4 @@ def three() -> int:
                  3, Func(None, None, False))
 
 def test_empty() -> None:
-    source = expected = ""
-    pattern = "def $some"
-
-    assert_match("def $some", source, 0)
+    assert_match("def $some", "", 0)

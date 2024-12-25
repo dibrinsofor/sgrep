@@ -1,5 +1,5 @@
 from pathlib import Path
-from src.parse_patterns import Tokenize, Parser, Node, SIdent
+from parse import Tokenize, Parser, Node, SIdent, Func, Class
 from src.match import MatchPatterns
 import ast
 from typing import Optional, Union

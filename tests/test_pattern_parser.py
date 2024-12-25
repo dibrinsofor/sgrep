@@ -1,4 +1,4 @@
-from src.parse_patterns import SIdent, Func, Args
+from parse import SIdent, Func, Args, KW
 from .utils import assert_parse
 
 def test_ident_w_wildcard() -> None:
@@ -15,6 +15,9 @@ def test_ident_w_wildcard_post() -> None:
 
 def test_get_kw() -> None:
     assert_parse("def", Func(None, None, False))
+
+def test_non_func_kw() -> None:
+    assert_parse("if", KW("if", None))
 
 def test_func_w_args() -> None:
     assert_parse("def (args=5, ^$self)", Func(None, Args(5, SIdent("self", False, False, False), []), False))

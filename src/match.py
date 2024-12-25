@@ -1,4 +1,4 @@
-from .parse_patterns import Func, SIdent, Class, Args
+from .parse import Func, SIdent, Class, Args
 from typing import Any, List, Dict, TypeVar, Generic, Union, overload
 import ast
 
