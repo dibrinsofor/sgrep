@@ -275,6 +275,8 @@ class Parser:
                             args = self.parse_args()
 
                         return Func(name, args, True)
+                    else:
+                        return KW(token.value, None)
                 case Type.SIGIL:
                     return self.parse_sigil_ident()
                 case Type.DECORATOR:

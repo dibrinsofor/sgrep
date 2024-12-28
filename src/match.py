@@ -1,25 +1,29 @@
-from .parse import Func, SIdent, Class, Args
-from typing import Any, List, Dict, TypeVar, Generic, Union, overload
+from dataclasses import dataclass
+from src.parse import Func, SIdent, Class, Args, Node, KW
+from typing import Any, List, Dict, TypeVar, Generic, Union, overload, Tuple
 import ast
 
-Nodes = Union[SIdent, Func, Class]
+Nodes = Union[Node, SIdent, Func, Class, KW]
 
 class SgrepMatchError(Exception):
     pass
 
-class MatchPatterns():
-    _registry: Dict[Nodes, ast.NodeVisitor] = {}
+T = TypeVar("T")
+
+class MatchPatterns(Generic[T]):
+    _registry: Dict[str, T] = {}
 
     @classmethod
-    def register(cls, pattern: Nodes, visitor_cls: ast.NodeVisitor) -> None:
+    def register(cls, pattern: str, visitor_cls: T) -> None:
         cls._registry[pattern] = visitor_cls
 
     @classmethod
-    def create(cls, pattern: Nodes) -> ast.NodeVisitor:
-        visitor_cls = cls._registry.get(pattern)
+    def create(cls, pattern: Nodes) -> T:
+        pattern_type: str = pattern.__class__.__name__
+        visitor_cls = cls._registry.get(pattern_type)
         if not visitor_cls:
             raise ValueError(f"Pattern not Implemented: {pattern}")
-        return visitor_cls(pattern)
+        return visitor_cls(pattern) #type: ignore
 
 class MatchPatternIdent(ast.NodeVisitor):
     def __init__(self, pattern: SIdent):
@@ -77,9 +81,8 @@ class MatchPatternFunc(ast.NodeVisitor):
         args = self.pattern.args
         local_matches = set()
 
-        # TODO: track file name, line number and node
         if not fname and not args:
-            self.matches.append(node) 
+            self.matches.append(node)
             return
         
         # some* or *some or some
@@ -112,9 +115,9 @@ class MatchPatternClass(ast.NodeVisitor):
         if bool(local_matches):
             self.matches.extend(local_matches)
 
-MatchPatterns.register(SIdent, MatchPatternIdent)
-MatchPatterns.register(Func, MatchPatternFunc)
-MatchPatterns.register(Class, MatchPatternClass)
+MatchPatterns.register("SIdent", MatchPatternIdent)
+MatchPatterns.register("Func", MatchPatternFunc)
+MatchPatterns.register("Class", MatchPatternClass)
 # MatchPatterns.register(Keyword, MatchKeyword)
 
 
