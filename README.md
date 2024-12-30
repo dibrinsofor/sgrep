@@ -1,28 +1,29 @@
-### SGrep
+## SGrep
 
-SGrep is a python syntax-oriented search tool that recursively searches directories for our regex-like query language with beautiful formatting in the terminal.
+SGrep is a python syntax-oriented search tool that recursively searches directories for our regex-like query language.
 
 ![Quick example of Sgrep](/static/sgrep%20landing.png)
 
-#### Usage
+Inspired by [Andy Friesen](https://andyfriesen.com/)'s work. 
+
+<!-- Another interesting projects is [Semantic Grep](https://github.com/arunsupe/semantic-grep). -->
+
+#### (Install and) Use
 ```zsh
->>> python -m src.main 'my_pattern' '/some_dir'
+>>> pip install -r requirements.txt
+>>> python -m src.main [PATTERN] [FILEPATH]
 ```
 
 #### Sgrep vs grep-like tools
 
-| Feature | Our Syntax | grep/rg | Advantage |
+| Feature | Sgrep | grep/rg | Advantage |
 |---------|------------|---------|-----------|
 | Syntax Awareness | Yes - understands code structure | No - line-based only | Our syntax provides accurate matches for nested structures |
-| Pattern Flexibility | Rich pattern language with identifiers | Regular expressions only | Our syntax is more readable and maintainable |
-| Context Matching | Matches entire statements/blocks | Single line or fixed-line context | Our syntax better handles multi-line code constructs |
 | Performance | See performance analysis below | Generally very fast | Depends on specific use case |
 
 
-> For all cases, the regex equivalent will only match the line containing the pattern whereas sgrep is syntax aware and will match the entire statement or expression.
-
-##### Performance
-Running `rg` (`def`) and and `sgrep`(`def`) against this project results in
+#### Performance
+Running `rg` (rg '`def`') and and `sgrep`(sgrep '`def`') against this project results in these times on average.
 
 ```python
 rg "def"  0.00s user 0.02s system 65% cpu 0.032 total
@@ -66,9 +67,8 @@ def (args=5)     # Function with 5 parameters
 def (^$self)     # Match function definitions whose first parameter is 'self'
 ```
 
-<!-- ##### TODO
-[ ] Idents need more context, maybe entire line or one line above and beneath 
-[] type directed queries
-[ ] Better query support for classes
-[ ] Improve docs
-caching results -->
+#### TODO
+- [ ] Fix failing cases
+- [ ] Type Directed Queries
+- [ ] Cache scan results
+- [ ] Better context for ident queries
