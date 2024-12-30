@@ -81,13 +81,14 @@ def proc_file(args: Tuple[object, str]) -> Result:
     return res
  
 @click.command()
+@click.option("-c", "count", is_flag=True)
 @click.argument("pattern", 
                 type=click.STRING, 
                 default="$*")
 @click.argument("filepath", 
                 type=click.Path(exists=True), 
                 default=CURR_DIR)
-def sgrep(pattern: str, filepath: str) -> None:
+def sgrep(pattern: str, filepath: str, count: bool) -> None:
     if not pattern:
         raise SgrepCommandError("Expected a pattern.")
 
@@ -97,6 +98,10 @@ def sgrep(pattern: str, filepath: str) -> None:
     processes = os.cpu_count() or 3
     with Pool(processes=processes) as pool:
         match_results = pool.map(proc_file, ((visitor, x) for x in get_py_file(filepath)))
+
+        if count:
+            RichConsole.print(len(match_results))
+            return
 
         for res in match_results:
             res.flush_res()
