@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 from dataclasses import dataclass, field
 import os
 import click
@@ -10,7 +8,7 @@ from src.parse import SIdent, Func, Class, KW, Tokenize, Parser, Node
 from src.match import MatchPatterns
 import ast
 from rich.console import Console
-from rich.text import Text
+from itertools import chain
 
 RichConsole = Console()
 
@@ -21,8 +19,10 @@ ALLOWED_SUFFIXES: Final = (PYTHON_SUFFIX, ".pyi", ".out", ".diff", ".ipynb")
 
 CURR_DIR = getcwd()
 
+
 class SgrepCommandError(Exception):
     pass
+
 
 @dataclass
 class Result:
@@ -34,20 +34,21 @@ class Result:
 
     def unparse(self, node: ast.AST) -> str:
         return ast.unparse(node)
-    
+
     def incr_count(self) -> int:
         self.count += 1
         return self.count
-    
+
     def print_match(self, tree: ast.AST) -> None:
         src = self.unparse(tree)
 
         RichConsole.print(f"{tree.lineno}: [not bold]{src}[/not bold]", style="bold")
-    
+
     def flush_res(self) -> None:
         with RichConsole.status("[bold green]Working on tasks..."):
             RichConsole.print(f"[magenta]{self.filename}")
             list(map(self.print_match, self.matches))
+
 
 def get_py_file(filepath: str) -> Generator[str, None, None]:
     if path.isfile(filepath):
@@ -59,10 +60,12 @@ def get_py_file(filepath: str) -> Generator[str, None, None]:
                 if file.endswith(ALLOWED_SUFFIXES):
                     yield path.join(root, file)
 
+
 def parse_command(src: str) -> Nodes:
     tokens = Tokenize(src)
     parser = Parser(tokens)
     return parser.parse_commands()
+
 
 def proc_file(args: Tuple[object, str]) -> Result:
     visitor, filepath = args
@@ -70,7 +73,7 @@ def proc_file(args: Tuple[object, str]) -> Result:
     res = Result()
     res.filename = filepath
 
-    with open(filepath, 'r') as f:
+    with open(filepath, "r") as f:
         src = f.read()
 
     tree = ast.parse(src)
@@ -79,15 +82,12 @@ def proc_file(args: Tuple[object, str]) -> Result:
     res.matches = visitor.matches
 
     return res
- 
+
+
 @click.command()
 @click.option("-c", "count", is_flag=True)
-@click.argument("pattern", 
-                type=click.STRING, 
-                default="$*")
-@click.argument("filepath", 
-                type=click.Path(exists=True), 
-                default=CURR_DIR)
+@click.argument("pattern", type=click.STRING, default="$*")
+@click.argument("filepath", type=click.Path(exists=True), default=CURR_DIR)
 def sgrep(pattern: str, filepath: str, count: bool) -> None:
     if not pattern:
         raise SgrepCommandError("Expected a pattern.")
@@ -95,16 +95,19 @@ def sgrep(pattern: str, filepath: str, count: bool) -> None:
     cmd = parse_command(pattern)
     visitor = MatchPatterns.create(cmd)
 
-    processes = os.cpu_count() or 3
+    processes = os.cpu_count() or 1
     with Pool(processes=processes) as pool:
-        match_results = pool.map(proc_file, ((visitor, x) for x in get_py_file(filepath)))
+        match_results = pool.map(
+            proc_file, ((visitor, x) for x in get_py_file(filepath))
+        )
 
         if count:
-            RichConsole.print(len(match_results))
+            RichConsole.print(sum([len(x.matches) for x in match_results]))
             return
 
         for res in match_results:
             res.flush_res()
+
 
 if __name__ == "__main__":
     sgrep()
