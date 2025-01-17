@@ -1,18 +1,13 @@
-#!/usr/bin/env python3
-
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import os
 import click
 from os import getcwd, path, walk
-from typing import Generator, Final, Union, List, Tuple
+from typing import Final, Union, List, Tuple
 from multiprocessing import Pool
 from src.parse import SIdent, Func, Class, KW, Tokenize, Parser, Node
 from src.match import MatchPatterns
-import ast
-from rich.console import Console
-from rich.text import Text
-
-RichConsole = Console()
+from ast import AST, parse, unparse
+from itertools import chain
 
 Nodes = Union[Node, SIdent, Func, Class, KW]
 
@@ -21,90 +16,101 @@ ALLOWED_SUFFIXES: Final = (PYTHON_SUFFIX, ".pyi", ".out", ".diff", ".ipynb")
 
 CURR_DIR = getcwd()
 
+
 class SgrepCommandError(Exception):
     pass
 
+
 @dataclass
 class Result:
-    count: int = 0
-    pattern: str = ""
-    matches: List[ast.AST] = field(default_factory=list)
-    first_lines: List[str] = field(default_factory=list)
-    filename: str = ""
+    def __init__(self, filename: str, matches: list[AST]) -> None:
+        self.count: int = 0
+        self.pattern: str = ""
+        self.matches: List[AST] = matches
+        self.first_lines: List[str] = []
+        self.filename: str = filename
 
-    def unparse(self, node: ast.AST) -> str:
-        return ast.unparse(node)
-    
+    # TODO
+    def uparse(self, node: AST) -> str:
+        return unparse(node)
+
     def incr_count(self) -> int:
         self.count += 1
         return self.count
-    
-    def print_match(self, tree: ast.AST) -> None:
-        src = self.unparse(tree)
 
-        RichConsole.print(f"{tree.lineno}: [not bold]{src}[/not bold]", style="bold")
-    
+    def print_match(self, tree: AST) -> None:
+        src = self.uparse(tree)
+
+        # TODO move this to a util file
+        # TODO conditionally apply colors based on term's capabilities
+        magenta = "\033[95m"  # ]
+        reset = "\033[0m"  # ]
+        bold = "\033[1m"  # ]
+
+        print(f"{bold}{magenta}{tree.lineno}:{reset} {src}")
+
     def flush_res(self) -> None:
-        with RichConsole.status("[bold green]Working on tasks..."):
-            RichConsole.print(f"[magenta]{self.filename}")
-            list(map(self.print_match, self.matches))
+        # TODO move this to a util file
+        magenta = "\033[95m"  # ]
+        reset = "\033[0m"  # ]
+        print(f"{magenta}{self.filename}{reset}")
+        list(map(self.print_match, self.matches))
 
-def get_py_file(filepath: str) -> Generator[str, None, None]:
+
+def get_py_file(filepath: str) -> list[str]:
     if path.isfile(filepath):
-        yield filepath
+        return [filepath]
     else:
-        for root, dirs, files in walk(filepath, topdown=True):
-            dirs[:] = [d for d in dirs if d not in [".git", ".venv"]]
-            for file in files:
-                if file.endswith(ALLOWED_SUFFIXES):
-                    yield path.join(root, file)
+
+        def get_fs(root: str, fs: list[str]) -> list[str]:
+            return [path.join(root, f) for f in fs if f.endswith(ALLOWED_SUFFIXES)]
+
+        return list(chain(*[get_fs(root, files) for root, _, files in walk(filepath)]))
+
 
 def parse_command(src: str) -> Nodes:
     tokens = Tokenize(src)
     parser = Parser(tokens)
     return parser.parse_commands()
 
+
 def proc_file(args: Tuple[object, str]) -> Result:
     visitor, filepath = args
 
-    res = Result()
-    res.filename = filepath
-
-    with open(filepath, 'r') as f:
+    with open(filepath, "r") as f:
         src = f.read()
 
-    tree = ast.parse(src)
+    tree = parse(src)
+
     visitor.visit(tree)
 
-    res.matches = visitor.matches
+    return Result(filepath, visitor.matches)
 
-    return res
- 
+
 @click.command()
 @click.option("-c", "count", is_flag=True)
-@click.argument("pattern", 
-                type=click.STRING, 
-                default="$*")
-@click.argument("filepath", 
-                type=click.Path(exists=True), 
-                default=CURR_DIR)
+@click.argument("pattern", type=click.STRING, default="$*")
+@click.argument("filepath", type=click.Path(exists=True), default=CURR_DIR)
 def sgrep(pattern: str, filepath: str, count: bool) -> None:
     if not pattern:
         raise SgrepCommandError("Expected a pattern.")
 
-    cmd = parse_command(pattern)
-    visitor = MatchPatterns.create(cmd)
+    visitor = MatchPatterns.create(parse_command(pattern))
+    files = list(get_py_file(filepath))
+    processes = min(os.cpu_count() or 1, len(files))
 
-    processes = os.cpu_count() or 3
-    with Pool(processes=processes) as pool:
-        match_results = pool.map(proc_file, ((visitor, x) for x in get_py_file(filepath)))
+    if processes == 1:
+        match_results = [proc_file((visitor, files[0]))]
+    else:
+        with Pool(processes=processes) as pool:
+            match_results = pool.map(proc_file, ((visitor, x) for x in files))
 
-        if count:
-            RichConsole.print(len(match_results))
-            return
+    if count:
+        print(sum([len(x.matches) for x in match_results]))
+        return
 
-        for res in match_results:
-            res.flush_res()
+    [res.flush_res() for res in match_results]
+
 
 if __name__ == "__main__":
     sgrep()
