@@ -7,10 +7,6 @@ from multiprocessing import Pool
 from src.parse import SIdent, Func, Class, KW, Tokenize, Parser, Node
 from src.match import MatchPatterns
 import ast
-from rich.console import Console
-from itertools import chain
-
-RichConsole = Console()
 
 Nodes = Union[Node, SIdent, Func, Class, KW]
 
@@ -41,13 +37,19 @@ class Result:
 
     def print_match(self, tree: ast.AST) -> None:
         src = self.unparse(tree)
+        # TODO move this to a util file
+        magenta = "\033[95m"  # ]
+        reset = "\033[0m"  # ]
+        bold = "\033[1m"  # ]
 
-        RichConsole.print(f"{tree.lineno}: [not bold]{src}[/not bold]", style="bold")
+        print(f"{bold}{magenta}{tree.lineno}:{reset} {src}")
 
     def flush_res(self) -> None:
-        with RichConsole.status("[bold green]Working on tasks..."):
-            RichConsole.print(f"[magenta]{self.filename}")
-            list(map(self.print_match, self.matches))
+        # TODO move this to a util file
+        magenta = "\033[95m"  # ]
+        reset = "\033[0m"  # ]
+        print(f"{magenta}{self.filename}{reset}")
+        list(map(self.print_match, self.matches))
 
 
 def get_py_file(filepath: str) -> Generator[str, None, None]:
@@ -101,12 +103,11 @@ def sgrep(pattern: str, filepath: str, count: bool) -> None:
             proc_file, ((visitor, x) for x in get_py_file(filepath))
         )
 
-        if count:
-            RichConsole.print(sum([len(x.matches) for x in match_results]))
-            return
+    if count:
+        print(sum([len(x.matches) for x in match_results]))
+        return
 
-        for res in match_results:
-            res.flush_res()
+    [res.flush_res() for res in match_results]
 
 
 if __name__ == "__main__":
